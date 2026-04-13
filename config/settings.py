@@ -16,7 +16,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-hl6^=k8zufe(085(cfoc@
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 # Change this to your actual Render domain after first deployment
-ALLOWED_HOSTS = ['*']   # For initial deployment. Later change to ['your-app-name.onrender.com']
+ALLOWED_HOSTS = ['.onrender.com', 'localhost', '127.0.0.1']   # For initial deployment. Later change to ['your-app-name.onrender.com']
 
 # ====================== APPLICATION DEFINITION ======================
 INSTALLED_APPS = [
