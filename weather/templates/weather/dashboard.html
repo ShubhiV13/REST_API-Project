@@ -1,0 +1,146 @@
+{% extends 'weather/base.html' %}
+{% block content %}
+
+<nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container">
+        <a class="navbar-brand fw-bold fs-3" href="/dashboard/">
+            <i class="fas fa-sun"></i> WeatherCast
+        </a>
+        <button onclick="logout()" class="btn btn-outline-light">Logout</button>
+    </div>
+</nav>
+
+<div class="container mt-5">
+    <h1 class="fw-bold text-center mb-5 text-white">Weather Forecast</h1>
+
+    <!-- Search Bar -->
+    <div class="row justify-content-center mb-5">
+        <div class="col-lg-8">
+            <div class="input-group shadow-lg">
+                <input type="text" id="cityInput" class="form-control form-control-lg" 
+                       placeholder="Enter city name" value="Mumbai">
+                <input type="date" id="dateInput" class="form-control form-control-lg">
+                <button onclick="getWeather()" class="btn btn-success btn-lg px-5">
+                    <i class="fas fa-search"></i> Get Weather
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Improved Weather Card -->
+    <div id="weatherResult" class="card p-5 d-none mx-auto" style="max-width: 720px;">
+        
+        <div class="row">
+            <!-- Left Side: City, Temp, Description -->
+            <div class="col-md-7">
+                <h2 id="cityDisplay" class="fw-bold mb-1"></h2>
+                <p id="dateDisplay" class="text-muted fs-5"></p>
+                
+                <div class="mt-4">
+                    <h1 id="tempDisplay" class="display-1 fw-light mb-0" style="font-size: 4.5rem;"></h1>
+                    <h4 id="descDisplay" class="text-muted mt-2"></h4>
+                </div>
+            </div>
+
+            <!-- Right Side: Weather Icon -->
+            <div class="col-md-5 text-center d-flex align-items-center justify-content-center">
+                <div id="weatherIcon" style="font-size: 140px; line-height: 1;"></div>
+            </div>
+        </div>
+
+        <hr class="my-4">
+
+        <!-- Bottom Details: Humidity & Wind -->
+        <div class="row text-center">
+            <div class="col-6">
+                <div class="d-flex flex-column align-items-center">
+                    <i class="fas fa-tint fa-3x text-info mb-3"></i>
+                    <strong class="fs-5">Humidity</strong>
+                    <h3 id="humidityDisplay" class="fw-bold text-dark mb-0"></h3>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="d-flex flex-column align-items-center">
+                    <i class="fas fa-wind fa-3x text-info mb-3"></i>
+                    <strong class="fs-5">Wind Speed</strong>
+                    <h3 id="windDisplay" class="fw-bold text-dark mb-0"></h3>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const token = localStorage.getItem('token');
+    if (!token) window.location.href = '/';
+
+    const weatherEmojis = {
+        0: "☀️", 1: "🌤️", 2: "⛅", 3: "☁️", 45: "🌫️", 
+        61: "🌧️", 71: "❄️", 80: "🌦️", 95: "⛈️"
+    };
+
+    async function getWeather() {
+        const city = document.getElementById('cityInput').value.trim();
+        if (!city) return alert("Please enter a city name");
+
+        try {
+            const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`);
+            const geoData = await geoRes.json();
+            if (!geoData.results) return alert("City not found");
+
+            const { latitude, longitude, name, country } = geoData.results[0];
+
+            const weatherRes = await fetch(
+                `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=8`
+            );
+            const wData = await weatherRes.json();
+
+            const selectedDate = document.getElementById('dateInput').value || new Date().toISOString().split('T')[0];
+            const dailyIndex = wData.daily.time.indexOf(selectedDate);
+
+            let displayTemp = `${wData.current.temperature_2m}°C`;
+            let displayDesc = "Current Weather";
+            let emoji = weatherEmojis[wData.current.weather_code] || "🌥️";
+
+            if (dailyIndex !== -1) {
+                displayTemp = `${wData.daily.temperature_2m_max[dailyIndex]}° / ${wData.daily.temperature_2m_min[dailyIndex]}°`;
+                displayDesc = getWeatherDescription(wData.daily.weather_code[dailyIndex]);
+                emoji = weatherEmojis[wData.daily.weather_code[dailyIndex]] || "🌥️";
+            }
+
+            // Update the UI
+            document.getElementById('weatherResult').classList.remove('d-none');
+            document.getElementById('cityDisplay').textContent = `${name}, ${country}`;
+            document.getElementById('dateDisplay').textContent = new Date(selectedDate).toLocaleDateString('en-IN', {
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+            });
+            document.getElementById('tempDisplay').textContent = displayTemp;
+            document.getElementById('descDisplay').textContent = displayDesc;
+            document.getElementById('weatherIcon').innerHTML = emoji;
+            document.getElementById('humidityDisplay').textContent = wData.current.relative_humidity_2m + "%";
+            document.getElementById('windDisplay').textContent = (wData.current.wind_speed_10m * 3.6).toFixed(1) + " km/h";
+
+        } catch (error) {
+            alert("Failed to fetch weather. Please try again.");
+            console.error(error);
+        }
+    }
+
+    function getWeatherDescription(code) {
+        const map = {0:"Clear Sky",1:"Mainly Clear",2:"Partly Cloudy",3:"Overcast",45:"Fog",61:"Rain",71:"Snow",80:"Showers"};
+        return map[code] || "Cloudy";
+    }
+
+    function logout() {
+        localStorage.removeItem('token');
+        window.location.href = '/';
+    }
+
+    // Set default date
+    window.onload = () => {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('dateInput').value = today;
+        document.getElementById('dateInput').min = today;
+    };
+</script>
+{% endblock %}
